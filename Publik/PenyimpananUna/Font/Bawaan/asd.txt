@@ -1,0 +1,200 @@
+<?php
+define('BASEPATH', TRUE);
+require_once './AppUnaCode/Rute.php';
+require_once './Inti/Inti.php';
+new Inti ();
+<?php
+defined('BASEPATH') or exit('Akses langsung ke skrip ini tidak diizinkan');
+
+class Inti
+{
+    private $Perutean;
+    private $Portal;
+
+    public function __construct()
+    {
+       
+        $this->CekRute();
+    }
+    
+    private function CekRute()
+    {
+        require_once 'Perutean.php';
+        $this->Perutean = new Perutean();
+        $hasil = $this->Perutean->Rute();
+        
+        if (isset($hasil['Error'])) {
+            echo 'adaerror';
+        } else {
+            $this->Mulai($hasil['File'],$hasil['Class'],$hasil['Method']);
+        }
+    }
+
+    public function Mulai($Arah, $Kendali, $Metode)
+    {
+        require_once 'Perlengkapan.php';
+        $this->Portal = new Perlengkapan();
+        $this->Portal->Masuk($Arah, $Kendali, $Metode);
+    }
+}
+<?php
+defined('BASEPATH') or exit('Akses langsung ke skrip ini tidak diizinkan');
+
+class Perutean
+{
+    private $rute;
+
+    public function __construct()
+    {
+        // Memuat file Rute.php
+        require_once './AppUnaCode/Rute.php';
+        global $Rute;
+        $this->rute = $Rute;
+    }
+
+    public function Rute()
+    {
+        $PecahRequest = explode('/', $_SERVER['REQUEST_URI']);
+        $Request = array_filter($PecahRequest, function ($Nilai) {
+            return $Nilai !== "";
+        });
+        array_shift($Request);
+
+        $Rute = $this->rute;
+        $URL = '';
+
+        if (empty($Request)) {
+            $URL = $Rute['SelamatDatang'];
+        } else {
+            $found = false;
+            foreach ($Request as $key) {
+                if (array_key_exists($key, $Rute)) {
+                    $URL = $Rute[$key];
+                    $found = true;
+                    break;
+                }
+            }
+
+            if (!$found) {
+                return ['Error' => 'URL {' . $key . '} TIDAK ADA DI FILE RUTE'];
+            }
+        }
+
+        if (count($URL) == 2) {
+            return $this->arahkan($URL[1], $URL[0]);
+        } else {
+            return $this->arahkan($URL);
+        }
+    }
+
+    public function arahkan($URL, $Folder = null)
+    {
+        $result = [];
+        if (is_array($URL)) {
+            // Gabungkan elemen array menjadi string
+            $URL = implode('', $URL);
+        }
+
+        // Pisahkan URL menggunakan '@' jika ada
+        $URL = explode('@', $URL);
+        if ($Folder === null) {
+            // Path ke file PHP
+            $ArahFile = './AppUnaCode/Kendali/' . $URL[0] . '.php';
+
+            if (file_exists($ArahFile)) {
+                // Asumsikan nama kelas sama dengan nama file tanpa ekstensi
+                $NamaClass = $URL[0];
+                $NamaMetode = $URL[1] ?? null;
+
+                // Masukkan file untuk mendefinisikan kelas
+                require_once $ArahFile;
+
+                if (class_exists($NamaClass)) {
+                    if (method_exists($NamaClass, $NamaMetode)) {
+                        $result['File'] = $ArahFile;
+                        $result['Class'] = $NamaClass;
+                        $result['Method'] = $NamaMetode;
+                    } else {
+                        $result['Error'] = 'tidak ada metode nya';
+                    }
+                } else {
+                    $result['Error'] = 'Tidak Ada Class {' . $NamaClass . '} Di File Kendali ' . $URL[0] . '.php';
+                }
+            } else {
+                $result['Error'] = 'Nama File ' . $URL[0] . '.php Tidak Ditemukan Di Kendali';
+            }
+        } else {
+            if (is_dir('./AppUnaCode/Kendali/' . $Folder)) {
+                $ArahFile = './AppUnaCode/Kendali/' . $Folder . '/' . $URL[0] . '.php';
+                if (file_exists($ArahFile)) {
+                    // Asumsikan nama kelas sama dengan nama file tanpa ekstensi
+                    $NamaClass = $URL[0];
+                    $NamaMetode = $URL[1] ?? null;
+                    // Masukkan file untuk mendefinisikan kelas
+                    require_once $ArahFile;
+
+                    if (class_exists($NamaClass)) {
+                        if (method_exists($NamaClass, $NamaMetode)) {
+                            $result['File'] = $ArahFile;
+                            $result['Class'] = $NamaClass;
+                            $result['Method'] = $NamaMetode;
+                        } else {
+                            $result['Error'] = 'tidak ada metode nya';
+                        }
+                    } else {
+                        $result['Error'] = 'Tidak Ada Class {' . $NamaClass . '} Di File Kendali ' . $URL[0] . '.php';
+                    }
+                } else {
+                    $result['Error'] = 'Nama File ' . $URL[0] . '.php Tidak Ditemukan Di Kendali /AppUnaCode/Kendali/'. $Folder;
+                }
+            } else {
+                $result['Error'] = "Folder {" . $Folder . "} tidak ada Di dalam Folder Kendali.";
+            }
+        }
+
+        return $result;
+    }
+}
+<?php
+defined('BASEPATH') or exit('No direct script access allowed');
+
+class Perlengkapan
+{
+    public function Masuk($Arah, $Kendali, $Metode)
+    {
+        if (file_exists($Arah)) {
+            include_once $Arah;
+            if (class_exists($Kendali)) {
+                $Rumah = new $Kendali;
+                if (method_exists($Rumah, $Metode)) {
+                    $Rumah->$Metode();
+                } else {
+                    echo "Metode {$Metode} tidak ada di kelas {$Kendali}.";
+                }
+            } else {
+                echo "Kelas {$Kendali} tidak ada.";
+            }
+        } else {
+            echo "File {$Arah} tidak ditemukan.";
+        }
+    }
+
+    public function Tampilkan($Tampilkan)
+    {
+        require_once 'AppUnaCode/Tampilan/' . $Tampilkan;
+    }
+}
+<?php
+class Hallo extends Perlengkapan
+{
+    public function yuhu()
+    {
+        echo "Ini adalah halaman Beranda";
+        $this->Tampilkan('tes.php');
+    }
+
+    public function tentang($param1 = '', $param2 = '')
+    {
+        echo " asdasd Ini adalah halaman Tentang. Param1: {$param1}, Param2: {$param2}";
+    }
+}
